@@ -3,6 +3,7 @@ import sys
 import hashlib
 import base64
 import csv
+import os
 from time import mktime, strptime
 
 DEFAULT_NB_RECORD = 15
@@ -42,11 +43,19 @@ def modeval(str):
 def convert_times(time):
     return int(mktime(strptime(time, '%Y-%m-%d %H:%M:%S (%Z)')))
 
+def get_file_hash(filename):
+    if len(filename) == 0 or not os.path.isfile(filename):
+        return ""
+    f = open(filename)
+    data = f.read()
+    f.close()
+    return hashlib.sha1(data).digest()
+
 def parse_row(mbdb, row):
     # First, check for anomality
-    filehash = hashlib.sha1(row[11] + '-' + row[9]).hexdigest() # domain-filename
-    if row[8] != filehash: # fileID saved in the CSV
-        print 'Error, the sha1 of %s returned %s while the CSV saved %s' % (row[9], filehash, row[8])
+    filenamehash = hashlib.sha1(row[11] + '-' + row[9]).hexdigest() # domain-filename
+    if row[8] != filenamehash: # fileID saved in the CSV
+        print 'Error, the sha1 of %s returned %s while the CSV saved %s' % (row[9], filenamehash, row[8])
         return
 
     writestring(mbdb, row[11]) # domain
@@ -56,7 +65,7 @@ def parse_row(mbdb, row):
     else:
         mbdb.write("\x00\x00")
     writestring(mbdb, row[10]) # linktarget
-    writestring(mbdb, base64.decodestring(row[13])) # datahash
+    writestring(mbdb, get_file_hash(row[8]) if row[13] else "") # datahash
     writestring(mbdb, base64.decodestring(row[14])) # enckey
     writeint(mbdb, modeval(row[0]), 2) # mode
     writeint(mbdb, int(row[1]), 8) # inode
